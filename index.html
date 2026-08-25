@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Todo アプリ</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#38bdf8">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Todo">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <h1>Todo</h1>
+
+    <section class="today-widget">
+      <div class="today-widget-header">
+        <h2 class="today-widget-title">Today</h2>
+        <span class="today-widget-subtitle">Today's task</span>
+      </div>
+      <div id="today-content"></div>
+    </section>
+
+    <hr class="section-divider" />
+
+    <nav id="category-nav" class="category-nav"></nav>
+    <nav id="sub-nav" class="sub-nav"></nav>
+
+    <div id="content"></div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
