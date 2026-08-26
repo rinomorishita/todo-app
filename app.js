@@ -2,6 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/fireba
 import {
   getAuth,
   GoogleAuthProvider,
+  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   signOut,
@@ -749,8 +750,23 @@ function handleSignedOut() {
   signinScreen.style.display = "flex";
 }
 
-document.getElementById("signin-btn").addEventListener("click", () => {
-  signInWithRedirect(auth, new GoogleAuthProvider());
+document.getElementById("signin-btn").addEventListener("click", async () => {
+  const provider = new GoogleAuthProvider();
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (err) {
+    if (err && err.code === "auth/popup-blocked") {
+      // Some browsers/contexts (e.g. certain in-app or PWA setups) block
+      // popups outright; fall back to a full-page redirect in that case.
+      signInWithRedirect(auth, provider);
+      return;
+    }
+    if (err && (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request")) {
+      return; // user dismissed the popup themselves; nothing to report
+    }
+    console.error("Sign-in failed:", err);
+    alert("ログインに失敗しました: " + (err && err.code ? err.code : String(err)));
+  }
 });
 
 // Surfaces the specific error (e.g. an unauthorized domain) if the redirect
