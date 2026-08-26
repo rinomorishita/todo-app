@@ -132,11 +132,17 @@ h1 {
 
 .todo-form {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 16px;
 }
 
-.todo-form input {
+.todo-form-row1 {
+  display: flex;
+  gap: 8px;
+}
+
+.todo-form-row1 input[type="text"] {
   flex: 1;
   padding: 12px 14px;
   border: 1px solid #d1d5db;
@@ -146,13 +152,42 @@ h1 {
   transition: border-color 0.15s;
 }
 
-.todo-form input:focus {
+.todo-form-row1 input[type="text"]:focus {
   border-color: #38bdf8;
 }
 
-.deadline-input {
-  flex: 0 0 auto;
-  padding: 12px 10px;
+.date-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.date-mode-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.date-mode-btn {
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.date-mode-btn.active {
+  background: #38bdf8;
+  border-color: #38bdf8;
+  color: #fff;
+}
+
+.date-input {
+  padding: 8px 10px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 13px;
@@ -160,11 +195,16 @@ h1 {
   outline: none;
 }
 
-.deadline-input:focus {
+.date-input:focus {
   border-color: #38bdf8;
 }
 
-.deadline-badge {
+.date-range-sep {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.date-badge {
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
@@ -174,7 +214,7 @@ h1 {
   white-space: nowrap;
 }
 
-.todo-form button {
+.todo-form-row1 button {
   padding: 12px 18px;
   border: none;
   border-radius: 8px;
@@ -186,7 +226,7 @@ h1 {
   transition: background 0.15s;
 }
 
-.todo-form button:hover {
+.todo-form-row1 button:hover {
   background: #0ea5e9;
 }
 

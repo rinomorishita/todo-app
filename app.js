@@ -738,18 +738,18 @@ function collectTodayEntries() {
     const items = state.todos[categoryKey] || [];
     for (const todo of items) {
       if (todo.completed) continue;
-      // Has a deadline: always shown (even once overdue) until done.
-      // No deadline: shown only on the day it was added.
-      const isToday = todo.deadline || todo.createdDate === todayStr;
+      // Has a deadline or period: always shown (even once overdue/past) until done.
+      // No date: shown only on the day it was added.
+      const isToday = hasActiveDate(todo) || todo.createdDate === todayStr;
       if (isToday) todayEntries.push({ todo, categoryKey });
     }
   }
 
   // Undated items (today's additions) come first; dated items sort to the
-  // bottom, soonest/most overdue deadline first.
+  // bottom, soonest/most overdue date first.
   todayEntries.sort((a, b) => {
-    const ad = a.todo.deadline || "";
-    const bd = b.todo.deadline || "";
+    const ad = dateSortKey(a.todo);
+    const bd = dateSortKey(b.todo);
     if (!ad && !bd) return 0;
     if (!ad) return -1;
     if (!bd) return 1;
@@ -824,14 +824,13 @@ function renderTodayItem(todo, categoryKey) {
     CATEGORY_LABELS[categoryKey] || categoryKey
   );
 
-  const deadlineBadge = todo.deadline
-    ? el("span", { class: "deadline-badge" }, `〆${formatDateShort(todo.deadline)}`)
-    : null;
+  const dateText = dateBadgeText(todo);
+  const dateBadge = dateText ? el("span", { class: "date-badge" }, dateText) : null;
 
   li.appendChild(checkbox);
   li.appendChild(text);
   li.appendChild(badge);
-  if (deadlineBadge) li.appendChild(deadlineBadge);
+  if (dateBadge) li.appendChild(dateBadge);
   return li;
 }
 
@@ -845,11 +844,48 @@ function renderTodoCategory(categoryKey) {
     maxLength: 200,
   });
 
-  const deadlineInput = el("input", {
-    type: "date",
-    class: "deadline-input",
-    title: "締切日（任意）",
-  });
+  let dateMode = "none"; // "none" | "deadline" | "period"
+  const deadlineInput = el("input", { type: "date", class: "date-input" });
+  const periodStartInput = el("input", { type: "date", class: "date-input" });
+  const periodEndInput = el("input", { type: "date", class: "date-input" });
+
+  const dateRow = el("div", { class: "date-row" });
+
+  function renderDateRow() {
+    dateRow.innerHTML = "";
+    const toggle = el(
+      "div",
+      { class: "date-mode-toggle" },
+      [
+        { key: "none", label: "日付なし" },
+        { key: "deadline", label: "締切" },
+        { key: "period", label: "期間" },
+      ].map((m) =>
+        el(
+          "button",
+          {
+            type: "button",
+            class: "date-mode-btn" + (dateMode === m.key ? " active" : ""),
+            onclick: () => {
+              dateMode = m.key;
+              renderDateRow();
+            },
+          },
+          m.label
+        )
+      )
+    );
+    dateRow.appendChild(toggle);
+
+    if (dateMode === "deadline") {
+      dateRow.appendChild(deadlineInput);
+    } else if (dateMode === "period") {
+      dateRow.appendChild(periodStartInput);
+      dateRow.appendChild(el("span", { class: "date-range-sep" }, "〜"));
+      dateRow.appendChild(periodEndInput);
+    }
+  }
+  renderDateRow();
 
   const form = el(
     "form",
@@ -859,20 +895,36 @@ function renderTodoCategory(categoryKey) {
         e.preventDefault();
         const text = input.value.trim();
         if (!text) return;
-        items.unshift({
+        const newTodo = {
           id: createId(),
           text,
           completed: false,
           createdDate: todayISO(),
-          deadline: deadlineInput.value || null,
-        });
+          deadline: null,
+          periodStart: null,
+          periodEnd: null,
+        };
+        if (dateMode === "deadline" && deadlineInput.value) {
+          newTodo.deadline = deadlineInput.value;
+        } else if (dateMode === "period" && periodStartInput.value) {
+          newTodo.periodStart = periodStartInput.value;
+          newTodo.periodEnd = periodEndInput.value || periodStartInput.value;
+        }
+        items.unshift(newTodo);
         saveState();
         input.value = "";
         deadlineInput.value = "";
+        periodStartInput.value = "";
+        periodEndInput.value = "";
+        dateMode = "none";
+        renderDateRow();
         renderContent();
       },
     },
-    [input, deadlineInput, el("button", { type: "submit" }, "追加")]
+    [
+      el("div", { class: "todo-form-row1" }, [input, el("button", { type: "submit" }, "追加")]),
+      dateRow,
+    ]
   );
 
   const filterRow = el(
@@ -952,9 +1004,8 @@ function renderTodoItem(todo, items) {
     ondblclick: () => startEditTodoText(li, todo),
   }, todo.text);
 
-  const deadlineBadge = todo.deadline
-    ? el("span", { class: "deadline-badge" }, `〆${formatDateShort(todo.deadline)}`)
-    : null;
+  const dateText = dateBadgeText(todo);
+  const dateBadge = dateText ? el("span", { class: "date-badge" }, dateText) : null;
 
   const deleteBtn = el(
     "button",
@@ -973,7 +1024,7 @@ function renderTodoItem(todo, items) {
 
   li.appendChild(checkbox);
   li.appendChild(text);
-  if (deadlineBadge) li.appendChild(deadlineBadge);
+  if (dateBadge) li.appendChild(dateBadge);
   li.appendChild(deleteBtn);
   return li;
 }
@@ -1099,6 +1150,24 @@ function formatDateShort(iso) {
   if (!iso) return "";
   const [, m, d] = iso.split("-");
   return `${Number(m)}/${Number(d)}`;
+}
+
+// A todo can carry either a single deadline date or a start~end period.
+function hasActiveDate(todo) {
+  return !!(todo.deadline || todo.periodStart);
+}
+
+function dateSortKey(todo) {
+  return todo.deadline || todo.periodStart || "";
+}
+
+function dateBadgeText(todo) {
+  if (todo.deadline) return `〆${formatDateShort(todo.deadline)}`;
+  if (todo.periodStart && todo.periodEnd && todo.periodStart !== todo.periodEnd) {
+    return `${formatDateShort(todo.periodStart)}〜${formatDateShort(todo.periodEnd)}`;
+  }
+  if (todo.periodStart) return formatDateShort(todo.periodStart);
+  return null;
 }
 
 /* ---------- Diary (diary text + next day plan) ---------- */
