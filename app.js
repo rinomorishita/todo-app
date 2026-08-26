@@ -1,3 +1,33 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut,
+  onAuthStateChanged,
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  onSnapshot,
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCFIM9V9C09vQNsqUOf5yw4RqOmUJH5OSg",
+  authDomain: "todo-app-25032.firebaseapp.com",
+  projectId: "todo-app-25032",
+  storageBucket: "todo-app-25032.firebasestorage.app",
+  messagingSenderId: "992707449756",
+  appId: "1:992707449756:web:e34cace69d61d618d0ae59",
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+
 const STORAGE_KEY = "todo-app-state-v3";
 const LEGACY_STORAGE_KEY_V2 = "todo-app-state-v2";
 const LEGACY_STORAGE_KEY_V1 = "todo-app-items";
@@ -553,9 +583,9 @@ const ENGLISH_BANK = [
   ["keep to yourself", "It's best to keep this information to yourself.", "この情報は自分の胸にしまっておくのが一番です。"],
 ];
 
-let state = loadState();
-state.todos = Object.assign(emptyTodos(), state.todos);
-state.dailyDone = Object.assign({ diary: null, english: null }, state.dailyDone);
+let state = normalizeState(null);
+let currentUser = null;
+let unsubscribeSnapshot = null;
 let currentGroupKey = "todo";
 let currentChildKey = "work";
 let uiFilter = "all";
@@ -566,12 +596,31 @@ const nav = document.getElementById("category-nav");
 const subNav = document.getElementById("sub-nav");
 const content = document.getElementById("content");
 const todayContent = document.getElementById("today-content");
+const accountBar = document.getElementById("account-bar");
+const signinScreen = document.getElementById("signin-screen");
+const appRoot = document.getElementById("app-root");
 
 function emptyTodos() {
   return { work: [], dailytask: [], shopping: [], travel: [], book: [], movie: [], music: [] };
 }
 
-function loadState() {
+// Fills in any missing fields so data from Firestore (or an older local
+// schema) always has the shape the rest of the app expects.
+function normalizeState(raw) {
+  const merged = Object.assign(
+    { todos: emptyTodos(), pilates: [], diary: [], dailyDone: { diary: null, english: null } },
+    raw || {}
+  );
+  merged.todos = Object.assign(emptyTodos(), merged.todos);
+  merged.dailyDone = Object.assign({ diary: null, english: null }, merged.dailyDone);
+  if (!Array.isArray(merged.pilates)) merged.pilates = [];
+  if (!Array.isArray(merged.diary)) merged.diary = [];
+  return merged;
+}
+
+// Reads this browser's pre-sync local data, migrating older schema
+// versions. Used only to seed a brand-new Firestore account on first sign-in.
+function loadLocalState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
@@ -613,9 +662,97 @@ function loadState() {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  renderTodayWidget();
+  if (!currentUser) return;
+  setDoc(doc(db, "users", currentUser.uid), state).catch((err) => {
+    console.error("Cloud sync failed:", err);
+  });
+}
+
+/* ---------- Auth & cloud sync ---------- */
+
+function initAppUI() {
+  renderNav();
+  renderSubNav();
+  renderContent();
   renderTodayWidget();
 }
+
+function startSync(uid) {
+  if (unsubscribeSnapshot) unsubscribeSnapshot();
+  unsubscribeSnapshot = onSnapshot(
+    doc(db, "users", uid),
+    (snap) => {
+      if (!snap.exists()) return;
+      const incoming = normalizeState(snap.data());
+      // Skip redundant re-renders caused by our own writes echoing back.
+      if (JSON.stringify(incoming) === JSON.stringify(state)) return;
+      state = incoming;
+      initAppUI();
+    },
+    (err) => console.error("Cloud sync listener error:", err)
+  );
+}
+
+function renderAccountBar() {
+  accountBar.innerHTML = "";
+  if (!currentUser) return;
+  accountBar.appendChild(el("span", { class: "account-email" }, currentUser.email || ""));
+  accountBar.appendChild(
+    el(
+      "button",
+      { class: "account-signout", onclick: () => signOut(auth) },
+      "ログアウト"
+    )
+  );
+}
+
+async function handleSignedIn(user) {
+  currentUser = user;
+  renderAccountBar();
+
+  const ref = doc(db, "users", user.uid);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    state = normalizeState(snap.data());
+  } else {
+    // First time this account is used: seed from any pre-existing local data.
+    state = normalizeState(loadLocalState());
+    await setDoc(ref, state);
+  }
+
+  startSync(user.uid);
+  signinScreen.style.display = "none";
+  appRoot.style.display = "block";
+  initAppUI();
+}
+
+function handleSignedOut() {
+  currentUser = null;
+  if (unsubscribeSnapshot) {
+    unsubscribeSnapshot();
+    unsubscribeSnapshot = null;
+  }
+  appRoot.style.display = "none";
+  signinScreen.style.display = "flex";
+}
+
+document.getElementById("signin-btn").addEventListener("click", () => {
+  signInWithRedirect(auth, new GoogleAuthProvider());
+});
+
+// Surfaces the specific error (e.g. an unauthorized domain) if the redirect
+// sign-in didn't succeed; a plain "no user" from onAuthStateChanged alone
+// wouldn't tell us why.
+getRedirectResult(auth).catch((err) => {
+  console.error("Sign-in failed:", err);
+  alert("ログインに失敗しました: " + (err && err.code ? err.code : "不明なエラー"));
+});
+
+onAuthStateChanged(auth, (user) => {
+  if (user) handleSignedIn(user);
+  else handleSignedOut();
+});
 
 function createId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -1336,9 +1473,4 @@ function renderEnglish() {
   content.appendChild(list);
 }
 
-/* ---------- Init ---------- */
-
-renderNav();
-renderSubNav();
-renderContent();
-renderTodayWidget();
+/* Init happens via onAuthStateChanged -> handleSignedIn (see "Auth & cloud sync" above). */

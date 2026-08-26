@@ -22,6 +22,78 @@ body {
   padding: 32px;
 }
 
+.signin-screen {
+  width: 100%;
+  max-width: 560px;
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.signin-card {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  padding: 48px 32px;
+  text-align: center;
+}
+
+.signin-title {
+  margin: 0 0 12px;
+  font-size: 28px;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.signin-desc {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.signin-btn {
+  padding: 14px 28px;
+  border: none;
+  border-radius: 8px;
+  background: #38bdf8;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.signin-btn:hover {
+  background: #0ea5e9;
+}
+
+.account-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 8px;
+  min-height: 18px;
+}
+
+.account-email {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.account-signout {
+  border: none;
+  background: transparent;
+  color: #0ea5e9;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .today-widget {
   background: linear-gradient(160deg, #f0f9ff 0%, #e0f2fe 100%);
   border: 1px solid #bae6fd;

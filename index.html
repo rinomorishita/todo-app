@@ -14,7 +14,16 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
+  <div id="signin-screen" class="signin-screen">
+    <div class="signin-card">
+      <h1 class="signin-title">Todo</h1>
+      <p class="signin-desc">Googleアカウントでログインすると、PCとスマホでタスクが自動的に同期されます。</p>
+      <button id="signin-btn" class="signin-btn">Googleでログイン</button>
+    </div>
+  </div>
+
+  <div id="app-root" class="app" style="display:none">
+    <div id="account-bar" class="account-bar"></div>
     <h1>Todo</h1>
 
     <section class="today-widget">
@@ -33,7 +42,7 @@
     <div id="content"></div>
   </div>
 
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {

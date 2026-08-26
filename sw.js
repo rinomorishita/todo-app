@@ -1,4 +1,4 @@
-const CACHE_NAME = "todo-app-cache-v1";
+const CACHE_NAME = "todo-app-cache-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -27,6 +27,10 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  // Only handle our own same-origin static files. Cross-origin requests
+  // (Firebase SDK, Auth, Firestore real-time sync, etc.) must go straight
+  // to the network, uninterrupted and uncached.
+  if (new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const network = fetch(event.request)
