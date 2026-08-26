@@ -711,20 +711,32 @@ async function handleSignedIn(user) {
   currentUser = user;
   renderAccountBar();
 
-  const ref = doc(db, "users", user.uid);
-  const snap = await getDoc(ref);
-  if (snap.exists()) {
-    state = normalizeState(snap.data());
-  } else {
-    // First time this account is used: seed from any pre-existing local data.
-    state = normalizeState(loadLocalState());
-    await setDoc(ref, state);
-  }
+  try {
+    const ref = doc(db, "users", user.uid);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      state = normalizeState(snap.data());
+    } else {
+      // First time this account is used: seed from any pre-existing local data.
+      state = normalizeState(loadLocalState());
+      await setDoc(ref, state);
+    }
 
-  startSync(user.uid);
-  signinScreen.style.display = "none";
-  appRoot.style.display = "block";
-  initAppUI();
+    startSync(user.uid);
+    signinScreen.style.display = "none";
+    appRoot.style.display = "block";
+    initAppUI();
+  } catch (err) {
+    // Surface the real cause instead of silently bouncing back to the
+    // sign-in screen (e.g. Firestore rules rejecting the read/write, or
+    // the database not existing yet).
+    console.error("Failed to load data after sign-in:", err);
+    alert(
+      "ログインはできましたが、データの読み込みに失敗しました。\n" +
+        "エラー: " + (err && err.code ? err.code : String(err)) +
+        "\n\nFirestoreのルール設定をご確認ください。"
+    );
+  }
 }
 
 function handleSignedOut() {
@@ -744,10 +756,14 @@ document.getElementById("signin-btn").addEventListener("click", () => {
 // Surfaces the specific error (e.g. an unauthorized domain) if the redirect
 // sign-in didn't succeed; a plain "no user" from onAuthStateChanged alone
 // wouldn't tell us why.
-getRedirectResult(auth).catch((err) => {
-  console.error("Sign-in failed:", err);
-  alert("ログインに失敗しました: " + (err && err.code ? err.code : "不明なエラー"));
-});
+getRedirectResult(auth)
+  .then((result) => {
+    console.log("getRedirectResult:", result ? `signed in as ${result.user.email}` : "no pending redirect");
+  })
+  .catch((err) => {
+    console.error("Sign-in failed:", err);
+    alert("ログインに失敗しました: " + (err && err.code ? err.code : "不明なエラー"));
+  });
 
 onAuthStateChanged(auth, (user) => {
   if (user) handleSignedIn(user);
