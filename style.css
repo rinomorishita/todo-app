@@ -591,6 +591,23 @@ h1 {
   background: #f0f9ff;
 }
 
+.phrase-item.memorized {
+  opacity: 0.55;
+}
+
+.phrase-item.memorized .phrase-idiom {
+  text-decoration: line-through;
+}
+
+.phrase-memorized-checkbox {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: #38bdf8;
+  margin-top: 1px;
+}
+
 .phrase-num {
   font-size: 13px;
   font-weight: 700;

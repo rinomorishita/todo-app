@@ -44,11 +44,6 @@ const GROUPS = [
     ],
   },
   {
-    key: "english",
-    label: "English",
-    children: null,
-  },
-  {
     key: "diary",
     label: "Diary",
     children: null,
@@ -62,6 +57,11 @@ const GROUPS = [
       { key: "movie", label: "Movie" },
       { key: "music", label: "Music" },
     ],
+  },
+  {
+    key: "english",
+    label: "English",
+    children: null,
   },
 ];
 
@@ -607,12 +607,15 @@ function emptyTodos() {
 // schema) always has the shape the rest of the app expects.
 function normalizeState(raw) {
   const merged = Object.assign(
-    { todos: emptyTodos(), diary: [], dailyDone: { diary: null, english: null } },
+    { todos: emptyTodos(), diary: [], dailyDone: { diary: null, english: null }, englishMemorized: {} },
     raw || {}
   );
   merged.todos = Object.assign(emptyTodos(), merged.todos);
   merged.dailyDone = Object.assign({ diary: null, english: null }, merged.dailyDone);
   if (!Array.isArray(merged.diary)) merged.diary = [];
+  if (!merged.englishMemorized || typeof merged.englishMemorized !== "object") {
+    merged.englishMemorized = {};
+  }
   return merged;
 }
 
@@ -1375,19 +1378,43 @@ function dayOfYear() {
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
+// Picks 10 for today, prioritizing idioms not yet marked "覚えた" (memorized).
+// Only once every idiom is memorized does the list start showing memorized
+// ones again (so the view is never empty).
 function getTodaysPhrases() {
   if (englishShuffleOverride) return englishShuffleOverride;
-  const startIndex = (dayOfYear() * 10) % ENGLISH_BANK.length;
+
+  const memorized = state.englishMemorized || {};
+  const unlearned = ENGLISH_BANK.filter(([idiom]) => !memorized[idiom]);
+  const learned = ENGLISH_BANK.filter(([idiom]) => memorized[idiom]);
+
   const result = [];
-  for (let i = 0; i < 10; i++) {
-    result.push(ENGLISH_BANK[(startIndex + i) % ENGLISH_BANK.length]);
+  if (unlearned.length > 0) {
+    const take = Math.min(10, unlearned.length);
+    const startIndex = (dayOfYear() * 10) % unlearned.length;
+    for (let i = 0; i < take; i++) {
+      result.push(unlearned[(startIndex + i) % unlearned.length]);
+    }
+  }
+  if (result.length < 10 && learned.length > 0) {
+    const remaining = 10 - result.length;
+    const take = Math.min(remaining, learned.length);
+    const startIndex = (dayOfYear() * remaining) % learned.length;
+    for (let i = 0; i < take; i++) {
+      result.push(learned[(startIndex + i) % learned.length]);
+    }
   }
   return result;
 }
 
 function renderEnglish() {
+  const memorizedCount = Object.values(state.englishMemorized || {}).filter(Boolean).length;
   const header = el("div", { class: "english-header" }, [
-    el("span", { class: "date-label" }, `${formatDateLabel(todayISO())} の熟語 10選（全${ENGLISH_BANK.length}個）`),
+    el(
+      "span",
+      { class: "date-label" },
+      `${formatDateLabel(todayISO())} の熟語 10選（全${ENGLISH_BANK.length}個 / 覚えた${memorizedCount}個）`
+    ),
     el(
       "button",
       {
@@ -1440,10 +1467,26 @@ function renderEnglish() {
         ])
       : el("div", { class: "phrase-answer" }, [el("div", { class: "phrase-ja" }, ja)]);
 
+    const memorizedCheckbox = el("input", {
+      type: "checkbox",
+      class: "phrase-memorized-checkbox",
+      title: "覚えた",
+      checked: !!(state.englishMemorized && state.englishMemorized[idiom]),
+      onclick: (e) => e.stopPropagation(),
+      onchange: (e) => {
+        state.englishMemorized = state.englishMemorized || {};
+        state.englishMemorized[idiom] = e.target.checked;
+        saveState();
+        renderContent();
+      },
+    });
+
+    const isMemorized = !!(state.englishMemorized && state.englishMemorized[idiom]);
     const li = el("li", {
-      class: "phrase-item",
+      class: "phrase-item" + (isMemorized ? " memorized" : ""),
       onclick: () => li.classList.toggle("revealed"),
     }, [
+      memorizedCheckbox,
       el("span", { class: "phrase-num" }, String(i + 1).padStart(2, "0")),
       el("div", { class: "phrase-body" }, [
         question,
