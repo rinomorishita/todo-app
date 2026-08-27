@@ -44,12 +44,9 @@ const GROUPS = [
     ],
   },
   {
-    key: "routine",
-    label: "Routine",
-    children: [
-      { key: "english", label: "English" },
-      { key: "pilates", label: "Pilates" },
-    ],
+    key: "english",
+    label: "English",
+    children: null,
   },
   {
     key: "diary",
@@ -590,6 +587,7 @@ let unsubscribeSnapshot = null;
 let currentGroupKey = "todo";
 let currentChildKey = "work";
 let uiFilter = "all";
+let todayTab = "task";
 let englishShuffleOverride = null;
 let englishDirection = "en2ja";
 
@@ -609,12 +607,11 @@ function emptyTodos() {
 // schema) always has the shape the rest of the app expects.
 function normalizeState(raw) {
   const merged = Object.assign(
-    { todos: emptyTodos(), pilates: [], diary: [], dailyDone: { diary: null, english: null } },
+    { todos: emptyTodos(), diary: [], dailyDone: { diary: null, english: null } },
     raw || {}
   );
   merged.todos = Object.assign(emptyTodos(), merged.todos);
   merged.dailyDone = Object.assign({ diary: null, english: null }, merged.dailyDone);
-  if (!Array.isArray(merged.pilates)) merged.pilates = [];
   if (!Array.isArray(merged.diary)) merged.diary = [];
   return merged;
 }
@@ -629,7 +626,7 @@ function loadLocalState() {
     /* ignore corrupt state */
   }
 
-  const fresh = { todos: emptyTodos(), pilates: [], diary: [] };
+  const fresh = { todos: emptyTodos(), diary: [] };
 
   try {
     const v2Raw = localStorage.getItem(LEGACY_STORAGE_KEY_V2);
@@ -641,7 +638,6 @@ function loadLocalState() {
       fresh.todos.music = oldTodos.music || [];
       fresh.todos.movie = oldTodos.bookmovie || [];
       fresh.todos.travel = (oldTodos.wishlist || []).map(({ tag, ...rest }) => rest);
-      fresh.pilates = v2.pilates || [];
       fresh.diary = v2.diary || [];
       return fresh;
     }
@@ -875,13 +871,7 @@ function renderContent() {
   content.innerHTML = "";
   if (currentGroupKey === "diary") {
     renderDiary();
-  } else if (currentChildKey === "pilates") {
-    renderJournalCategory({
-      storeKey: "pilates",
-      textLabel: "気づいたことメモ",
-      placeholder: "今日のピラティスで気づいたこと..."
-    });
-  } else if (currentChildKey === "english") {
+  } else if (currentGroupKey === "english") {
     renderEnglish();
   } else {
     renderTodoCategory(currentChildKey);
@@ -899,24 +889,8 @@ function goTo(groupKey, childKey) {
   }
 }
 
-function collectTodayEntries() {
-  const todayStr = todayISO();
-  const todayEntries = [];
-
-  for (const categoryKey of TODO_KEYS) {
-    const items = state.todos[categoryKey] || [];
-    for (const todo of items) {
-      if (todo.completed) continue;
-      // Has a deadline or period: always shown (even once overdue/past) until done.
-      // No date: shown only on the day it was added.
-      const isToday = hasActiveDate(todo) || todo.createdDate === todayStr;
-      if (isToday) todayEntries.push({ todo, categoryKey });
-    }
-  }
-
-  // Undated items (today's additions) come first; dated items sort to the
-  // bottom, soonest/most overdue date first.
-  todayEntries.sort((a, b) => {
+function sortByDate(entries) {
+  entries.sort((a, b) => {
     const ad = dateSortKey(a.todo);
     const bd = dateSortKey(b.todo);
     if (!ad && !bd) return 0;
@@ -924,21 +898,74 @@ function collectTodayEntries() {
     if (!bd) return 1;
     return ad.localeCompare(bd);
   });
+  return entries;
+}
 
-  return todayEntries;
+function collectTodayEntries() {
+  const todayStr = todayISO();
+  const todayEntries = [];
+  const otherEntries = [];
+
+  for (const categoryKey of TODO_KEYS) {
+    const items = state.todos[categoryKey] || [];
+    for (const todo of items) {
+      if (todo.completed) continue;
+      (isInTodaysTask(todo, todayStr) ? todayEntries : otherEntries).push({ todo, categoryKey });
+    }
+  }
+
+  // Undated items (today's additions) come first; dated items sort to the
+  // bottom, soonest/most overdue date first.
+  return { todayEntries: sortByDate(todayEntries), otherEntries: sortByDate(otherEntries) };
 }
 
 function renderTodayWidget() {
   todayContent.innerHTML = "";
+  renderTodaySubnav();
 
+  const { todayEntries, otherEntries } = collectTodayEntries();
   const list = el("ul", { class: "today-list" });
-  list.appendChild(renderTodayFixedEntry("📔", "日記を書く", "diary", null, "diary"));
-  list.appendChild(renderTodayFixedEntry("📚", "英熟語を確認する", "routine", "english", "english"));
-  for (const { todo, categoryKey } of collectTodayEntries()) {
-    list.appendChild(renderTodayItem(todo, categoryKey));
+
+  if (todayTab === "others") {
+    if (otherEntries.length === 0) {
+      list.appendChild(el("li", { class: "empty-state" }, "予定はありません"));
+    } else {
+      for (const { todo, categoryKey } of otherEntries) {
+        list.appendChild(renderTodayItem(todo, categoryKey));
+      }
+    }
+  } else {
+    list.appendChild(renderTodayFixedEntry("📔", "日記を書く", "diary", null, "diary"));
+    list.appendChild(renderTodayFixedEntry("📚", "英熟語を確認する", "english", null, "english"));
+    for (const { todo, categoryKey } of todayEntries) {
+      list.appendChild(renderTodayItem(todo, categoryKey));
+    }
   }
 
   todayContent.appendChild(list);
+}
+
+function renderTodaySubnav() {
+  const bar = document.getElementById("today-subnav");
+  bar.innerHTML = "";
+  [
+    { key: "task", label: "Today's task" },
+    { key: "others", label: "Others" },
+  ].forEach((t) => {
+    bar.appendChild(
+      el(
+        "button",
+        {
+          class: "sub-nav-btn" + (todayTab === t.key ? " active" : ""),
+          onclick: () => {
+            todayTab = t.key;
+            renderTodayWidget();
+          },
+        },
+        t.label
+      )
+    );
+  });
 }
 
 function renderTodayFixedEntry(icon, label, groupKey, childKey, doneKey) {
@@ -1228,87 +1255,6 @@ function startEditTodoText(li, todo) {
   });
 }
 
-/* ---------- Journal-style category (Pilates) ---------- */
-
-function renderJournalCategory({ storeKey, textLabel, placeholder }) {
-  const entries = state[storeKey] || (state[storeKey] = []);
-
-  const dateInput = el("input", { type: "date", value: todayISO() });
-  const textArea = el("textarea", { placeholder });
-
-  const form = el(
-    "form",
-    {
-      class: "journal-form",
-      onsubmit: (e) => {
-        e.preventDefault();
-        const text = textArea.value.trim();
-        if (!text) return;
-        entries.unshift({ id: createId(), date: dateInput.value || todayISO(), text });
-        saveState();
-        renderContent();
-      },
-    },
-    [
-      el("div", {}, [el("label", {}, "日付"), dateInput]),
-      el("div", {}, [el("label", {}, textLabel), textArea]),
-      el("button", { type: "submit" }, "追加"),
-    ]
-  );
-
-  const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
-  const list = el("ul", { class: "journal-list" });
-  if (sorted.length === 0) {
-    list.appendChild(el("li", { class: "empty-state" }, "記録はありません"));
-  } else {
-    for (const entry of sorted) {
-      list.appendChild(renderJournalCard(entry, entries));
-    }
-  }
-
-  content.appendChild(form);
-  content.appendChild(list);
-}
-
-function renderJournalCard(entry, entries) {
-  const card = el("li", { class: "journal-card" });
-  const p = el("p", { ondblclick: () => startEditJournalText(p, entry) }, entry.text);
-  card.appendChild(el("div", { class: "journal-date" }, formatDateLabel(entry.date)));
-  card.appendChild(p);
-  card.appendChild(
-    el(
-      "button",
-      {
-        class: "delete-btn",
-        "aria-label": "削除",
-        onclick: () => {
-          const idx = entries.indexOf(entry);
-          if (idx !== -1) entries.splice(idx, 1);
-          saveState();
-          renderContent();
-        },
-      },
-      "×"
-    )
-  );
-  return card;
-}
-
-function startEditJournalText(p, entry) {
-  const textArea = el("textarea", { value: entry.text });
-  p.replaceWith(textArea);
-  textArea.focus();
-
-  const commit = () => {
-    const value = textArea.value.trim();
-    if (value) entry.text = value;
-    saveState();
-    renderContent();
-  };
-
-  textArea.addEventListener("blur", commit);
-}
-
 function formatDateLabel(iso) {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
@@ -1322,8 +1268,16 @@ function formatDateShort(iso) {
 }
 
 // A todo can carry either a single deadline date or a start~end period.
-function hasActiveDate(todo) {
-  return !!(todo.deadline || todo.periodStart);
+// Whether this todo belongs in "Today's task" (as opposed to "Others").
+//  - deadline: always shown (even once overdue) until done.
+//  - period: shown only while today falls within [start, end].
+//  - no date: shown only on the day it was added.
+function isInTodaysTask(todo, todayStr) {
+  if (todo.deadline) return true;
+  if (todo.periodStart && todo.periodEnd) {
+    return todo.periodStart <= todayStr && todayStr <= todo.periodEnd;
+  }
+  return todo.createdDate === todayStr;
 }
 
 function dateSortKey(todo) {

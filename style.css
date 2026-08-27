@@ -119,14 +119,8 @@ body {
   letter-spacing: 0.02em;
 }
 
-.today-widget-subtitle {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #0ea5e9;
-  background: #fff;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid #bae6fd;
+.today-widget-header .sub-nav {
+  margin: 0;
 }
 
 .section-divider {
@@ -420,7 +414,7 @@ h1 {
   color: #ef4444;
 }
 
-/* Journal-style sections (Pilates / Diary) */
+/* Journal-style section (Diary) */
 .journal-form {
   display: flex;
   flex-direction: column;
