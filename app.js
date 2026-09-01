@@ -879,6 +879,8 @@ function renderContent() {
     renderDiary();
   } else if (currentGroupKey === "english") {
     renderEnglish();
+  } else if (currentGroupKey === "wishlist") {
+    renderWishlistCategory(currentChildKey);
   } else {
     renderTodoCategory(currentChildKey);
   }
@@ -1258,6 +1260,205 @@ function startEditTodoText(li, todo) {
       renderContent();
     }
   });
+}
+
+/* ---------- Wish List (no dates; memo + star rating once completed) ---------- */
+
+function renderWishlistCategory(categoryKey) {
+  const items = state.todos[categoryKey] || (state.todos[categoryKey] = []);
+
+  const input = el("input", {
+    type: "text",
+    placeholder: "やりたいことを入力...",
+    autocomplete: "off",
+    maxLength: 200,
+  });
+
+  const form = el(
+    "form",
+    {
+      class: "todo-form",
+      onsubmit: (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+        items.unshift({ id: createId(), text, completed: false, memo: "", rating: 0 });
+        saveState();
+        input.value = "";
+        renderContent();
+      },
+    },
+    [el("div", { class: "todo-form-row1" }, [input, el("button", { type: "submit" }, "追加")])]
+  );
+
+  const filterRow = el(
+    "div",
+    { class: "filters" },
+    [
+      { key: "all", label: "すべて" },
+      { key: "active", label: "未完了" },
+      { key: "completed", label: "完了済み" },
+    ].map((f) =>
+      el(
+        "button",
+        {
+          class: "filter-btn" + (uiFilter === f.key ? " active" : ""),
+          onclick: () => {
+            uiFilter = f.key;
+            renderContent();
+          },
+        },
+        f.label
+      )
+    )
+  );
+
+  let filtered = items;
+  if (uiFilter === "active") filtered = filtered.filter((t) => !t.completed);
+  if (uiFilter === "completed") filtered = filtered.filter((t) => t.completed);
+
+  const list = el("ul", { class: "todo-list" });
+  if (filtered.length === 0) {
+    list.appendChild(el("li", { class: "empty-state" }, "タスクはありません"));
+  } else {
+    for (const todo of filtered) {
+      list.appendChild(renderWishlistItem(todo, items));
+    }
+  }
+
+  const remaining = items.filter((t) => !t.completed).length;
+  const footer = el("div", { class: "footer" }, [
+    el("span", {}, `${remaining} 件残り`),
+    el(
+      "button",
+      {
+        class: "clear-btn",
+        onclick: () => {
+          state.todos[categoryKey] = items.filter((t) => !t.completed);
+          saveState();
+          renderContent();
+        },
+      },
+      "完了済みを削除"
+    ),
+  ]);
+
+  content.appendChild(form);
+  content.appendChild(filterRow);
+  content.appendChild(list);
+  content.appendChild(footer);
+}
+
+function renderWishlistItem(todo, items) {
+  const li = el("li", { class: "wishlist-item" + (todo.completed ? " completed" : "") });
+
+  const checkbox = el("input", {
+    type: "checkbox",
+    checked: todo.completed,
+    onchange: () => {
+      todo.completed = !todo.completed;
+      saveState();
+      renderContent();
+    },
+  });
+
+  const text = el(
+    "span",
+    {
+      class: "wishlist-text",
+      title: "ダブルクリックで編集",
+      ondblclick: () => startEditWishlistText(li, todo),
+    },
+    todo.text
+  );
+
+  const deleteBtn = el(
+    "button",
+    {
+      class: "delete-btn",
+      "aria-label": "削除",
+      onclick: () => {
+        const idx = items.indexOf(todo);
+        if (idx !== -1) items.splice(idx, 1);
+        saveState();
+        renderContent();
+      },
+    },
+    "×"
+  );
+
+  const row = el("div", { class: "wishlist-row" }, [checkbox, text, deleteBtn]);
+  li.appendChild(row);
+  if (todo.completed) li.appendChild(renderWishlistCompletion(todo));
+  return li;
+}
+
+function startEditWishlistText(li, todo) {
+  const editInput = el("input", {
+    type: "text",
+    class: "todo-text-input",
+    value: todo.text,
+    maxLength: 200,
+  });
+
+  const textEl = li.querySelector(".wishlist-text");
+  textEl.replaceWith(editInput);
+  editInput.focus();
+  editInput.setSelectionRange(editInput.value.length, editInput.value.length);
+
+  const commit = () => {
+    const value = editInput.value.trim();
+    if (value) todo.text = value;
+    saveState();
+    renderContent();
+  };
+
+  editInput.addEventListener("blur", commit);
+  editInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") editInput.blur();
+    if (e.key === "Escape") {
+      editInput.removeEventListener("blur", commit);
+      renderContent();
+    }
+  });
+}
+
+function renderWishlistCompletion(todo) {
+  const panel = el("div", { class: "wishlist-completion" });
+
+  const stars = el("div", { class: "star-rating" });
+  for (let n = 1; n <= 5; n++) {
+    stars.appendChild(
+      el(
+        "button",
+        {
+          type: "button",
+          class: "star-btn" + ((todo.rating || 0) >= n ? " filled" : ""),
+          "aria-label": `評価${n}`,
+          onclick: () => {
+            todo.rating = todo.rating === n ? 0 : n;
+            saveState();
+            renderContent();
+          },
+        },
+        "★"
+      )
+    );
+  }
+
+  const memoArea = el("textarea", {
+    class: "wishlist-memo",
+    placeholder: "感想・メモを書く...",
+    value: todo.memo || "",
+    onblur: (e) => {
+      todo.memo = e.target.value.trim();
+      saveState();
+    },
+  });
+
+  panel.appendChild(stars);
+  panel.appendChild(memoArea);
+  return panel;
 }
 
 function formatDateLabel(iso) {

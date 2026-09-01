@@ -379,6 +379,79 @@ h1 {
   transition: color 0.15s;
 }
 
+/* Wish List: no strikethrough on completion; memo + star rating instead */
+.wishlist-item {
+  padding: 12px 4px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.wishlist-item:last-child {
+  border-bottom: none;
+}
+
+.wishlist-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wishlist-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: #38bdf8;
+}
+
+.wishlist-text {
+  flex: 1;
+  font-size: 15px;
+  word-break: break-word;
+  cursor: text;
+}
+
+.wishlist-completion {
+  margin: 10px 0 2px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.star-rating {
+  display: flex;
+  gap: 2px;
+}
+
+.star-btn {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  color: #e5e7eb;
+}
+
+.star-btn.filled {
+  color: #f59e0b;
+}
+
+.wishlist-memo {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+}
+
+.wishlist-memo:focus {
+  border-color: #38bdf8;
+}
+
 .delete-btn:hover {
   color: #ef4444;
 }
