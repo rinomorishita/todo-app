@@ -38,8 +38,8 @@ const GROUPS = [
     key: "todo",
     label: "To do",
     children: [
+      { key: "dailytask", label: "Daily" },
       { key: "work", label: "Work" },
-      { key: "dailytask", label: "Daily task" },
       { key: "shopping", label: "Shopping" },
     ],
   },
@@ -65,7 +65,10 @@ const GROUPS = [
   },
 ];
 
-const TODO_KEYS = ["work", "dailytask", "shopping", "travel", "book", "movie", "music"];
+// Categories scanned for the Today dashboard (Today's task / Others).
+// Diary and Wish List are intentionally excluded — they only show in their
+// own tabs, never on the Today dashboard.
+const TODO_KEYS = ["dailytask", "work", "shopping"];
 
 const CATEGORY_LABELS = {};
 const CATEGORY_TO_GROUP = {};
@@ -607,11 +610,11 @@ function emptyTodos() {
 // schema) always has the shape the rest of the app expects.
 function normalizeState(raw) {
   const merged = Object.assign(
-    { todos: emptyTodos(), diary: [], dailyDone: { diary: null, english: null }, englishMemorized: {} },
+    { todos: emptyTodos(), diary: [], dailyDone: { english: null }, englishMemorized: {} },
     raw || {}
   );
   merged.todos = Object.assign(emptyTodos(), merged.todos);
-  merged.dailyDone = Object.assign({ diary: null, english: null }, merged.dailyDone);
+  merged.dailyDone = Object.assign({ english: null }, merged.dailyDone);
   if (!Array.isArray(merged.diary)) merged.diary = [];
   if (!merged.englishMemorized || typeof merged.englishMemorized !== "object") {
     merged.englishMemorized = {};
@@ -938,7 +941,6 @@ function renderTodayWidget() {
       }
     }
   } else {
-    list.appendChild(renderTodayFixedEntry("📔", "日記を書く", "diary", null, "diary"));
     list.appendChild(renderTodayFixedEntry("📚", "英熟語を確認する", "english", null, "english"));
     for (const { todo, categoryKey } of todayEntries) {
       list.appendChild(renderTodayItem(todo, categoryKey));
