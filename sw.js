@@ -1,4 +1,4 @@
-const CACHE_NAME = "todo-app-cache-v2";
+const CACHE_NAME = "todo-app-cache-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -31,16 +31,18 @@ self.addEventListener("fetch", (event) => {
   // (Firebase SDK, Auth, Firestore real-time sync, etc.) must go straight
   // to the network, uninterrupted and uncached.
   if (new URL(event.request.url).origin !== self.location.origin) return;
+  // Network-first: always try to get the latest deployed file first (this
+  // app changes often), and only fall back to the cache when there's no
+  // connection at all. This avoids "my update isn't showing up" on
+  // installed PWAs, where a cache-first strategy can get stuck on stale
+  // content that a normal browser cache-clear doesn't reach.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const network = fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
