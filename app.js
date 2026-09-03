@@ -67,8 +67,9 @@ const GROUPS = [
 
 // Categories scanned for the Today dashboard (Today's task / Others).
 // Diary and Wish List are intentionally excluded — they only show in their
-// own tabs, never on the Today dashboard.
-const TODO_KEYS = ["dailytask", "work", "shopping"];
+// own tabs, never on the Today dashboard. Shopping is also excluded here —
+// it gets its own always-on "Shopping" tab instead (see collectShoppingEntries).
+const TODO_KEYS = ["dailytask", "work"];
 
 const CATEGORY_LABELS = {};
 const CATEGORY_TO_GROUP = {};
@@ -927,14 +928,24 @@ function collectTodayEntries() {
   return { todayEntries: sortByDate(todayEntries), otherEntries: sortByDate(otherEntries) };
 }
 
+// Shopping always shows every not-yet-bought item, regardless of date —
+// dated ones just float to the top, soonest first.
+function collectShoppingEntries() {
+  const items = (state.todos.shopping || []).filter((t) => !t.completed);
+  const dated = items.filter((t) => dateSortKey(t) !== "");
+  const undated = items.filter((t) => dateSortKey(t) === "");
+  dated.sort((a, b) => dateSortKey(a).localeCompare(dateSortKey(b)));
+  return [...dated, ...undated];
+}
+
 function renderTodayWidget() {
   todayContent.innerHTML = "";
   renderTodaySubnav();
 
-  const { todayEntries, otherEntries } = collectTodayEntries();
   const list = el("ul", { class: "today-list" });
 
   if (todayTab === "others") {
+    const { otherEntries } = collectTodayEntries();
     if (otherEntries.length === 0) {
       list.appendChild(el("li", { class: "empty-state" }, "予定はありません"));
     } else {
@@ -942,7 +953,17 @@ function renderTodayWidget() {
         list.appendChild(renderTodayItem(todo, categoryKey));
       }
     }
+  } else if (todayTab === "shopping") {
+    const shoppingEntries = collectShoppingEntries();
+    if (shoppingEntries.length === 0) {
+      list.appendChild(el("li", { class: "empty-state" }, "買うものはありません"));
+    } else {
+      for (const todo of shoppingEntries) {
+        list.appendChild(renderTodayItem(todo, "shopping"));
+      }
+    }
   } else {
+    const { todayEntries } = collectTodayEntries();
     list.appendChild(renderTodayFixedEntry("📚", "英熟語を確認する", "english", null, "english"));
     for (const { todo, categoryKey } of todayEntries) {
       list.appendChild(renderTodayItem(todo, categoryKey));
@@ -958,6 +979,7 @@ function renderTodaySubnav() {
   [
     { key: "task", label: "Today's task" },
     { key: "others", label: "Others" },
+    { key: "shopping", label: "Shopping" },
   ].forEach((t) => {
     bar.appendChild(
       el(
@@ -1028,7 +1050,13 @@ function renderTodayItem(todo, categoryKey) {
   );
 
   const dateText = dateBadgeText(todo);
-  const dateBadge = dateText ? el("span", { class: "date-badge" }, dateText) : null;
+  const dateBadge = dateText
+    ? el(
+        "span",
+        { class: "date-badge", title: "タップして編集", onclick: () => startEditDateBadge(li, todo) },
+        dateText
+      )
+    : null;
 
   li.appendChild(checkbox);
   li.appendChild(text);
@@ -1208,7 +1236,13 @@ function renderTodoItem(todo, items) {
   }, todo.text);
 
   const dateText = dateBadgeText(todo);
-  const dateBadge = dateText ? el("span", { class: "date-badge" }, dateText) : null;
+  const dateBadge = dateText
+    ? el(
+        "span",
+        { class: "date-badge", title: "タップして編集", onclick: () => startEditDateBadge(li, todo) },
+        dateText
+      )
+    : null;
 
   const deleteBtn = el(
     "button",
@@ -1260,6 +1294,49 @@ function startEditTodoText(li, todo) {
       renderContent();
     }
   });
+}
+
+function startEditDateBadge(li, todo) {
+  const isPeriod = !!(todo.periodStart || todo.periodEnd);
+  const container = el("span", { class: "date-badge-edit" });
+
+  const startInput = el("input", {
+    type: "date",
+    class: "date-input",
+    value: (isPeriod ? todo.periodStart : todo.deadline) || "",
+  });
+  container.appendChild(startInput);
+
+  let endInput = null;
+  if (isPeriod) {
+    endInput = el("input", { type: "date", class: "date-input", value: todo.periodEnd || "" });
+    container.appendChild(el("span", { class: "date-range-sep" }, "〜"));
+    container.appendChild(endInput);
+  }
+
+  const commit = () => {
+    if (isPeriod) {
+      if (startInput.value) {
+        todo.periodStart = startInput.value;
+        todo.periodEnd = endInput.value || startInput.value;
+      } else {
+        todo.periodStart = null;
+        todo.periodEnd = null;
+      }
+    } else {
+      todo.deadline = startInput.value || null;
+    }
+    saveState();
+    renderContent();
+  };
+
+  container.appendChild(
+    el("button", { type: "button", class: "date-edit-save", onclick: commit }, "✓")
+  );
+
+  const badgeEl = li.querySelector(".date-badge");
+  badgeEl.replaceWith(container);
+  startInput.focus();
 }
 
 /* ---------- Wish List (no dates; memo + star rating once completed) ---------- */

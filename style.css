@@ -278,6 +278,36 @@ h1 {
   background: #fef3c7;
   color: #b45309;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.date-badge-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.date-badge-edit .date-input {
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.date-edit-save {
+  border: none;
+  background: #38bdf8;
+  color: #fff;
+  border-radius: 999px;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.date-edit-save:hover {
+  background: #0ea5e9;
 }
 
 .todo-form-row1 button {
